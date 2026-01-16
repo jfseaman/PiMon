@@ -34,6 +34,7 @@ start:
 	systemctl start ${TARGET}
 
 restart:
+	systemctl daemon-reload
 	systemctl restart ${TARGET}
 
 stop:

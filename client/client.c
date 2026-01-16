@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     }
 
     openlog("PiMon_Client", LOG_PID | LOG_CONS, LOG_DAEMON);
-    syslog(LOG_ERR,"Server: %s\n", server_ip);
+    syslog(LOG_ERR,"Server: %s", server_ip);
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -174,6 +174,12 @@ int main(int argc, char **argv) {
 
     struct sockaddr_in server = {0};
     memcpy(&server, res->ai_addr, sizeof(server));
+    char resolved_ip[INET_ADDRSTRLEN] = {0};
+    if (inet_ntop(AF_INET, &server.sin_addr, resolved_ip, sizeof(resolved_ip))) {
+        syslog(LOG_INFO, "Server resolved to %s", resolved_ip);
+    } else {
+        syslog(LOG_INFO, "Server resolved (address conversion failed)");
+    }
     freeaddrinfo(res);
 
     TelemetryPacket pkt = {0};
