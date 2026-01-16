@@ -1,11 +1,11 @@
 OPTS   = -O2 -Wall
 ENTRY  = server.c
-LIBS   = ws2_32.lib
+LIBS   = ws2_32.lib user32.lib gdi32.lib
 TARGET = PiMon_Server
 
 # COMPILE:
 compile:
-	cl ${OPTS} ${ENTRY} ${LIBS} -o ${TARGET}
+	cl ${OPTS} ${ENTRY} ${LIBS} -o ${TARGET} /link /SUBSYSTEM:WINDOWS
 
 clean:
 	del ${TARGET}
