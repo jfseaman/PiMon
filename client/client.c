@@ -4,13 +4,15 @@
 #include <unistd.h>
 #include <limits.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <time.h>
 #include <stdbool.h>
+#include <syslog.h>
 #include <glob.h> // Required for wildcard matching
 
-#define SERVER_IP   "192.168.68.56"   // change me
 #define SERVER_PORT 5000
 #define CLIENT_ID_LEN 32
+static const char *SERVER_ENV = "PIMON_SERVER_IP";
 
 // #define CLIENT_DIAGNOSTICS
 
@@ -137,21 +139,48 @@ float read_fan_speed() {
 
 /* ---------- Main ---------- */
 
-int main() {
+int main(int argc, char **argv) {
     DIAG_PRINT("Starting client UDP broadcaster\n");
+
+    const char *server_ip = NULL;
+    if (argc > 1 && argv[1][0] != '\0') {
+        server_ip = argv[1];
+    } else {
+        server_ip = getenv(SERVER_ENV);
+    }
+    if (!server_ip || server_ip[0] == '\0') {
+        fprintf(stderr, "Usage: %s <server_ip>\n", argv[0]);
+        fprintf(stderr, "Or set %s in the environment.\n", SERVER_ENV);
+        return 1;
+    }
+
+    openlog("PiMon_Client", LOG_PID | LOG_CONS, LOG_DAEMON);
+    syslog(LOG_ERR,"Server: %s\n", server_ip);
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
+    struct addrinfo hints = {0};
+    struct addrinfo *res = NULL;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    char port_str[16];
+    snprintf(port_str, sizeof(port_str), "%d", SERVER_PORT);
+    if (getaddrinfo(server_ip, port_str, &hints, &res) != 0 || !res) {
+        syslog(LOG_ERR, "Unable to resolve server: %s", server_ip);
+        closelog();
+        return 1;
+    }
+
     struct sockaddr_in server = {0};
-    server.sin_family = AF_INET;
-    server.sin_port   = htons(SERVER_PORT);
-    inet_pton(AF_INET, SERVER_IP, &server.sin_addr);
+    memcpy(&server, res->ai_addr, sizeof(server));
+    freeaddrinfo(res);
 
     TelemetryPacket pkt = {0};
     gethostname(pkt.client_id, CLIENT_ID_LEN);
     get_fan_file();
 
-    DIAG_PRINT("Entering main loop\n");
+    syslog(LOG_ERR,"Entering main loop");
 
     while (1) {
         pkt.cpu_load  = read_cpu_load();
@@ -167,4 +196,6 @@ int main() {
 
         sleep(1);
     }
+    closelog();
+    return 0;
 }

@@ -44,3 +44,8 @@ enable:
 
 status:
 	systemctl status ${TARGET}
+
+update:
+	systemctl -f stop ${TARGET}.service
+	cp ${TARGET} /usr/sbin/${TARGET}
+	chown root:root /usr/sbin/${TARGET}

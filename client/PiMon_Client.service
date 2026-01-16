@@ -4,7 +4,7 @@ After=sysinit.target
 
 [Service]
 ExecStart=/usr/bin/sh -c 'exec /usr/sbin/PiMon_Client'
-Environment="PIMON_SERVER=your server ip here"
+Environment="PIMON_SERVER_IP=your server ip or name here"
 Type=simple
 User=root
 Group=root
