@@ -1,0 +1,1 @@
+cl -o PiMon_Server -O2 server.c ws2_32.lib

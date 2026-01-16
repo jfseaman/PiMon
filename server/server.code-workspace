@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"makefile.makefilePath": "D:\\Users\\fseam\\Documents\\GitHub\\jfseaman\\PiMon\\server",
+		"ollama.model": "nomic-embed-text:latest"
+	}
+}

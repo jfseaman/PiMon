@@ -1,0 +1,14 @@
+[Unit]
+Description=Pi Monitor Client UPD sender
+After=sysinit.target
+
+[Service]
+ExecStart=/usr/bin/sh -c 'exec /usr/sbin/PiMon_Client'
+Environment="PIMON_SERVER=your server ip here"
+Type=simple
+User=root
+Group=root
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
