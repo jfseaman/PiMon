@@ -5,7 +5,7 @@ TARGET = PiMon_Server
 
 # COMPILE:
 compile:
-	cl ${OPTS} ${ENTRY} ${LIBS} -o ${TARGET} /link /SUBSYSTEM:WINDOWS
+	cl ${OPTS} ${ENTRY} ${LIBS} -o ${TARGET} /link /SUBSYSTEM:WINDOWS /MACHINE:X64
 
 clean:
 	del ${TARGET}
