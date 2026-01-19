@@ -12,6 +12,7 @@
 
 #define SERVER_PORT 5000
 #define CLIENT_ID_LEN 32
+#define RESOLVE_INTERVAL_SEC 60
 static const char *SERVER_ENV = "PIMON_SERVER_IP";
 
 // #define CLIENT_DIAGNOSTICS
@@ -38,6 +39,32 @@ bool argon40_fan=false;
 uint64_t argon40_period=0;
 
 /* ---------- Helpers ---------- */
+
+static int resolve_server(const char *server_host, int port,
+                          struct sockaddr_in *out,
+                          char *out_ip, size_t out_ip_len) {
+    struct addrinfo hints = {0};
+    struct addrinfo *res = NULL;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    char port_str[16];
+    snprintf(port_str, sizeof(port_str), "%d", port);
+    if (getaddrinfo(server_host, port_str, &hints, &res) != 0 || !res) {
+        return -1;
+    }
+
+    struct sockaddr_in *addr = (struct sockaddr_in *)res->ai_addr;
+    *out = *addr;
+
+    if (out_ip && out_ip_len > 0) {
+        out_ip[0] = '\0';
+        inet_ntop(AF_INET, &out->sin_addr, out_ip, out_ip_len);
+    }
+
+    freeaddrinfo(res);
+    return 0;
+}
 
 void print_packet(const TelemetryPacket *p) {
     DIAG_PRINT("---- Telemetry Packet ----\n");
@@ -159,28 +186,19 @@ int main(int argc, char **argv) {
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
-    struct addrinfo hints = {0};
-    struct addrinfo *res = NULL;
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-
-    char port_str[16];
-    snprintf(port_str, sizeof(port_str), "%d", SERVER_PORT);
-    if (getaddrinfo(server_ip, port_str, &hints, &res) != 0 || !res) {
+    struct sockaddr_in server = {0};
+    char resolved_ip[INET_ADDRSTRLEN] = {0};
+    if (resolve_server(server_ip, SERVER_PORT, &server,
+                       resolved_ip, sizeof(resolved_ip)) != 0) {
         syslog(LOG_ERR, "Unable to resolve server: %s", server_ip);
         closelog();
         return 1;
     }
-
-    struct sockaddr_in server = {0};
-    memcpy(&server, res->ai_addr, sizeof(server));
-    char resolved_ip[INET_ADDRSTRLEN] = {0};
-    if (inet_ntop(AF_INET, &server.sin_addr, resolved_ip, sizeof(resolved_ip))) {
+    if (resolved_ip[0] != '\0') {
         syslog(LOG_INFO, "Server resolved to %s", resolved_ip);
     } else {
         syslog(LOG_INFO, "Server resolved (address conversion failed)");
     }
-    freeaddrinfo(res);
 
     TelemetryPacket pkt = {0};
     gethostname(pkt.client_id, CLIENT_ID_LEN);
@@ -188,12 +206,37 @@ int main(int argc, char **argv) {
 
     syslog(LOG_ERR,"Entering main loop");
 
+    time_t last_resolve = time(NULL);
+
     while (1) {
+        time_t now = time(NULL);
+        if (now - last_resolve >= RESOLVE_INTERVAL_SEC) {
+            struct sockaddr_in new_server = {0};
+            char new_ip[INET_ADDRSTRLEN] = {0};
+            if (resolve_server(server_ip, SERVER_PORT, &new_server,
+                               new_ip, sizeof(new_ip)) == 0) {
+                if (memcmp(&new_server.sin_addr, &server.sin_addr,
+                           sizeof(server.sin_addr)) != 0) {
+                    char old_ip[INET_ADDRSTRLEN] = {0};
+                    inet_ntop(AF_INET, &server.sin_addr, old_ip, sizeof(old_ip));
+                    server = new_server;
+                    if (new_ip[0] == '\0') {
+                        snprintf(new_ip, sizeof(new_ip), "unknown");
+                    }
+                    syslog(LOG_INFO, "Server IP changed: %s -> %s",
+                           old_ip[0] ? old_ip : "unknown", new_ip);
+                }
+            } else {
+                syslog(LOG_WARNING, "Server lookup failed: %s", server_ip);
+            }
+            last_resolve = now;
+        }
+
         pkt.cpu_load  = read_cpu_load();
         pkt.cpu_temp  = read_cpu_temp();
         pkt.cpu_mhz   = read_cpu_mhz();
         pkt.fan_speed = read_fan_speed();
-        pkt.timestamp = time(NULL);
+        pkt.timestamp = (uint64_t)now;
 
         print_packet(&pkt);
 
