@@ -91,7 +91,9 @@ static const char *g_menu_items[] = {
     "Clear all",
     "Clear offline",
     "Select text",
-    "Prefrences"
+    "Preferences",
+    NULL,
+    "Exit"
 };
 
 enum {
@@ -99,7 +101,9 @@ enum {
     MENU_CLEAR_OFFLINE = 1,
     MENU_SELECT_TEXT = 2,
     MENU_PREFS = 3,
-    MENU_COUNT = 4
+    MENU_SEPARATOR = 4,
+    MENU_EXIT = 5,
+    MENU_COUNT = 6
 };
 
 static void notify_main_thread(void)
@@ -392,6 +396,13 @@ static void draw_menu(Display *dpy, Window win, GC gc, int line_height)
                    MENU_DROP_W, MENU_ITEM_H * MENU_COUNT);
     for (i = 0; i < MENU_COUNT; i++) {
         int y = MENU_BAR_H + i * MENU_ITEM_H;
+        if (i == MENU_SEPARATOR) {
+            int line_y = y + (MENU_ITEM_H / 2);
+            XDrawLine(dpy, win, gc,
+                      MENU_PAD_X + 8, line_y,
+                      MENU_PAD_X + MENU_DROP_W - 8, line_y);
+            continue;
+        }
         if (i == g_menu_hover) {
             XFillRectangle(dpy, win, gc, MENU_PAD_X + 1, y + 1,
                            MENU_DROP_W - 1, MENU_ITEM_H - 1);
@@ -556,6 +567,7 @@ static int menu_hit_item(int x, int y)
     if (y < MENU_BAR_H || y > (MENU_BAR_H + MENU_ITEM_H * MENU_COUNT)) return -1;
     rel = (y - MENU_BAR_H) / MENU_ITEM_H;
     if (rel < 0 || rel >= MENU_COUNT) return -1;
+    if (rel == MENU_SEPARATOR) return -1;
     return rel;
 }
 
@@ -645,6 +657,15 @@ static void handle_menu_action(Display *dpy,
         }
     } else if (action == MENU_PREFS) {
         open_preferences_dialog(dpy, screen, win, wm_delete_window);
+    } else if (action == MENU_EXIT) {
+        XEvent close_event;
+        memset(&close_event, 0, sizeof(close_event));
+        close_event.type = ClientMessage;
+        close_event.xclient.window = win;
+        close_event.xclient.format = 32;
+        close_event.xclient.data.l[0] = wm_delete_window;
+        XPutBackEvent(dpy, &close_event);
+        return;
     }
 
     notify_main_thread();
