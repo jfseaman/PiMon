@@ -17,6 +17,7 @@ strip:
 # INSTALL/UNINSTALL:
 install:
 	cp ${TARGET} /usr/sbin/${TARGET}
+	chmod +x /usr/sbin/${TARGET}
 	chown root:root /usr/sbin/${TARGET}
 	cp ${TARGET}.service /etc/systemd/system/${TARGET}.service
 	systemctl enable ${TARGET}.service
